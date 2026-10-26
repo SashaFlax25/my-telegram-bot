@@ -1,12 +1,27 @@
 import random
 import os
+import threading
+from flask import Flask
 import telebot
 
-# Бот будет безопасно брать токен из настроек сервера Render
+# 1. Запуск фонового веб-сервера для Render
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "Бот работает стабильно!"
+
+def run_web_server():
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port)
+
+# Запускаем сервер в отдельном потоке
+threading.Thread(target=run_web_server).start()
+
+# 2. Настройка самого Telegram-бота
 BOT_TOKEN = os.environ.get('BOT_TOKEN', '8706024761:AAEiHBbTLsNdGKyJT4vaurzdop34uZeDvlk')
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# Наша база данных в памяти телефона
 USER_DATA = {}
 
 @bot.message_handler(commands=['start'])
@@ -26,17 +41,14 @@ def start_message(message):
         "👉 `ферма сбор` — собрать доход с ферм"
     )
 
-# Обработка всех текстовых команд
 @bot.message_handler(content_types=['text'])
 def handle_text(message):
     user_id = message.from_user.id
-    text = message.text.lower().strip() # Этот метод делает ЛЮБУЮ букву маленькой для проверки!
+    text = message.text.lower().strip()
 
-    # Если пользователя нет в базе, регистрируем
     if user_id not in USER_DATA:
         USER_DATA[user_id] = {'balance': 5000, 'farms': 0}
 
-    # 1. КОМАНДА: БАЛАНС (сработает на Б, б, баланс, Баланс)
     if text in ["баланс", "/баланс", "б"]:
         balance = USER_DATA[user_id]['balance']
         farms = USER_DATA[user_id]['farms']
@@ -47,7 +59,6 @@ def handle_text(message):
             f"🚜 Майнинг-фермы: {farms} шт. (приносят доход!)"
         )
 
-    # 2. КОМАНДА: МАГАЗИН
     elif text in ["магазин", "/магазин"]:
         bot.send_message(
             message.chat.id,
@@ -58,7 +69,6 @@ def handle_text(message):
             f"Для покупки напишите: `купить ферму`"
         )
 
-    # 3. КОМАНДА: КУПИТЬ ФЕРМУ
     elif text == "купить ферму":
         if USER_DATA[user_id]['balance'] >= 3000:
             USER_DATA[user_id]['balance'] -= 3000
@@ -71,7 +81,6 @@ def handle_text(message):
         else:
             bot.send_message(message.chat.id, "❌ У вас недостаточно монет! Ферма стоит 3000 монет.")
 
-    # 4. КОМАНДА: СБОР ДОХОДА
     elif text == "ферма сбор":
         farms = USER_DATA[user_id]['farms']
         if farms == 0:
@@ -86,14 +95,13 @@ def handle_text(message):
                 f"💰 Новый баланс: {USER_DATA[user_id]['balance']} монет."
             )
 
-    # 5. КОМАНДА: КАЗИНО (сработает на казино, Казино, К 100, к 100)
     elif text.startswith("казино") or text.startswith("к "):
         args = text.split()
         if len(args) < 2:
             return bot.send_message(message.chat.id, "❌ Напиши ставку через пробел! Пример: `К 100`")
         try:
             bet = int(args[1])
-        except ValueError:
+        except (ValueError, IndexError):
             return bot.send_message(message.chat.id, "❌ Ставка должна быть числом!")
         if bet <= 0:
             return bot.send_message(message.chat.id, "❌ Ставка должна быть больше нуля!")
@@ -109,4 +117,3 @@ def handle_text(message):
 
 print("Бот успешно обновлен и запущен...")
 bot.infinity_polling()
-      
